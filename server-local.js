@@ -4,14 +4,13 @@
  * Then test: http://localhost:3001/api/sms-send
  */
 
-import dotenv from 'dotenv';
-import express from 'express';
-import smsHandler from './api/sms-send.js';
-
-dotenv.config();
-
+require('dotenv').config();
+const express = require('express');
 const app = express();
 const PORT = 3001;
+
+// Import the API handler (will be loaded dynamically)
+let smsHandler;
 
 // Middleware
 app.use(express.json());
@@ -26,12 +25,20 @@ app.use((req, res, next) => {
   next();
 });
 
-// API route
-app.get('/api/sms-send', (req, res) => {
+// API route (dynamically import ES module)
+app.get('/api/sms-send', async (req, res) => {
+  if (!smsHandler) {
+    const module = await import('./api/sms-send.js');
+    smsHandler = module.default;
+  }
   smsHandler(req, res);
 });
 
-app.post('/api/sms-send', (req, res) => {
+app.post('/api/sms-send', async (req, res) => {
+  if (!smsHandler) {
+    const module = await import('./api/sms-send.js');
+    smsHandler = module.default;
+  }
   smsHandler(req, res);
 });
 
