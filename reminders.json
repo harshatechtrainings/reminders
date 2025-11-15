@@ -1,0 +1,35 @@
+{
+  "reminders": [
+    {
+      "date": "2025-11-15",
+      "tablet": "Vitamin D - 1000 IU",
+      "time": "morning",
+      "notes": "Take after breakfast"
+    },
+    {
+      "date": "2025-11-16",
+      "tablet": "Calcium - 500mg",
+      "time": "evening",
+      "notes": "Take with dinner"
+    },
+    {
+      "date": "2025-11-17",
+      "tablet": "Multivitamin",
+      "time": "morning",
+      "notes": "Take with water"
+    },
+    {
+      "date": "2025-11-18",
+      "tablet": "Omega-3 Fish Oil",
+      "time": "morning",
+      "notes": "Take after meal"
+    },
+    {
+      "date": "2025-11-19",
+      "tablet": "Vitamin B Complex",
+      "time": "afternoon",
+      "notes": "Take with lunch"
+    }
+  ]
+}
+
