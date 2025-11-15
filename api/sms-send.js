@@ -10,7 +10,7 @@
  * - Sends SMS with tablet information if reminder exists
  */
 
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 
 /**
@@ -25,21 +25,43 @@ function getTodaysDate() {
 }
 
 /**
- * Check if there's a reminder for today
+ * Get all reminders for today from all JSON files in data/ folder
+ * Returns array of { name, phone, reminder } objects
  */
-function getTodaysReminder() {
+function getAllTodaysReminders() {
   try {
-    const remindersPath = join(process.cwd(), 'reminders.json');
-    const remindersData = readFileSync(remindersPath, 'utf8');
-    const reminders = JSON.parse(remindersData);
+    const dataPath = join(process.cwd(), 'data');
+    const files = readdirSync(dataPath).filter(f => f.endsWith('.json'));
     
     const todaysDate = getTodaysDate();
-    const todaysReminder = reminders.reminders.find(r => r.date === todaysDate);
+    const allReminders = [];
     
-    return todaysReminder;
+    for (const file of files) {
+      try {
+        const filePath = join(dataPath, file);
+        const fileData = readFileSync(filePath, 'utf8');
+        const reminderFile = JSON.parse(fileData);
+        
+        // Find reminder for today in this file
+        const todaysReminder = reminderFile.reminders?.find(r => r.date === todaysDate);
+        
+        if (todaysReminder) {
+          allReminders.push({
+            name: reminderFile.name,
+            phone: reminderFile.phone,
+            reminder: todaysReminder,
+            source: file
+          });
+        }
+      } catch (fileError) {
+        console.error(`Error reading ${file}:`, fileError.message);
+      }
+    }
+    
+    return allReminders;
   } catch (error) {
-    console.error('Error reading reminders.json:', error);
-    return null;
+    console.error('Error reading reminders from data folder:', error);
+    return [];
   }
 }
 
@@ -70,117 +92,141 @@ export default async function handler(req, res) {
     const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
     const TWILIO_MESSAGING_SERVICE_SID = process.env.TWILIO_MESSAGING_SERVICE_SID;
     const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER;
-    const RECIPIENT = process.env.RECIPIENT;
     
-    // Check if there's a reminder for today
-    const todaysReminder = getTodaysReminder();
+    // Get all reminders for today from all JSON files
+    const allTodaysReminders = getAllTodaysReminders();
     
-    let MESSAGE_TEXT;
-    if (todaysReminder) {
-      // Build message from reminder data
-      MESSAGE_TEXT = `📋 Daily Reminder!\n\n💊 Tablet: ${todaysReminder.tablet}\n🕐 Time: ${todaysReminder.time}\n📝 Notes: ${todaysReminder.notes}`;
-      console.log(`Found reminder for today (${getTodaysDate()}):`, todaysReminder);
-    } else {
-      // No reminder for today - check if we should send a default message
+    if (allTodaysReminders.length === 0) {
+      // No reminders for today
       const sendDefaultMessage = process.env.SEND_DEFAULT_MESSAGE !== 'false';
       
       if (!sendDefaultMessage) {
         return res.status(200).json({
           success: true,
-          message: 'No reminder for today',
+          message: 'No reminders for today',
           date: getTodaysDate(),
           skipped: true
         });
       }
       
-      MESSAGE_TEXT = process.env.MESSAGE_TEXT || 'Daily update ✅ - No specific reminder for today!';
-      console.log(`No reminder found for today (${getTodaysDate()}), using default message`);
+      console.log(`No reminders found for today (${getTodaysDate()})`);
+      return res.status(200).json({
+        success: true,
+        message: 'No reminders scheduled for today',
+        date: getTodaysDate()
+      });
     }
+    
+    console.log(`Found ${allTodaysReminders.length} reminder(s) for today (${getTodaysDate()})`);
+    
+    // Send SMS to each person with a reminder
+    const results = [];
+    
+    for (const { name, phone, reminder, source } of allTodaysReminders) {
+      const MESSAGE_TEXT = `📋 Hello ${name}!\n\n💊 Tablet: ${reminder.tablet}\n🕐 Time: ${reminder.time}\n📝 Notes: ${reminder.notes}`;
+      const RECIPIENT = phone;
 
-    // Validate required environment variables
-    // Either MessagingServiceSid OR PhoneNumber is required (not both)
-    if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !RECIPIENT) {
-      return res.status(500).json({
-        error: 'Missing required environment variables',
-        required: ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'RECIPIENT', 'TWILIO_MESSAGING_SERVICE_SID or TWILIO_PHONE_NUMBER'],
-        missing: {
-          TWILIO_ACCOUNT_SID: !TWILIO_ACCOUNT_SID,
-          TWILIO_AUTH_TOKEN: !TWILIO_AUTH_TOKEN,
-          RECIPIENT: !RECIPIENT
+      // Validate required environment variables
+      if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
+        results.push({
+          name,
+          phone,
+          success: false,
+          error: 'Missing Twilio credentials'
+        });
+        continue;
+      }
+
+      if (!TWILIO_MESSAGING_SERVICE_SID && !TWILIO_PHONE_NUMBER) {
+        results.push({
+          name,
+          phone,
+          success: false,
+          error: 'Missing sender configuration'
+        });
+        continue;
+      }
+
+      console.log(`[${new Date().toISOString()}] Sending SMS to ${name} (${RECIPIENT})`);
+
+      try {
+        // Twilio API endpoint
+        const twilioApiUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
+
+        // Create Basic Auth header
+        const authHeader = 'Basic ' + Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64');
+
+        // Prepare the SMS payload
+        const formData = new URLSearchParams();
+        
+        // Use MessagingServiceSid if provided, otherwise use From phone number
+        if (TWILIO_MESSAGING_SERVICE_SID) {
+          formData.append('MessagingServiceSid', TWILIO_MESSAGING_SERVICE_SID);
+        } else {
+          formData.append('From', TWILIO_PHONE_NUMBER);
         }
-      });
+        
+        formData.append('To', RECIPIENT);
+        formData.append('Body', MESSAGE_TEXT);
+
+        // Send POST request to Twilio API
+        const response = await fetch(twilioApiUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': authHeader,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: formData.toString()
+        });
+
+        const responseData = await response.json();
+
+        // Check if the request was successful
+        if (!response.ok) {
+          console.error(`SMS failed for ${name}:`, responseData);
+          results.push({
+            name,
+            phone,
+            success: false,
+            error: responseData.message || 'Failed to send SMS',
+            reminder: reminder
+          });
+        } else {
+          console.log(`SMS sent successfully to ${name}:`, responseData.sid);
+          results.push({
+            name,
+            phone,
+            success: true,
+            messageId: responseData.sid,
+            status: responseData.status,
+            reminder: reminder
+          });
+        }
+      } catch (smsError) {
+        console.error(`Error sending SMS to ${name}:`, smsError);
+        results.push({
+          name,
+          phone,
+          success: false,
+          error: smsError.message,
+          reminder: reminder
+        });
+      }
     }
 
-    if (!TWILIO_MESSAGING_SERVICE_SID && !TWILIO_PHONE_NUMBER) {
-      return res.status(500).json({
-        error: 'Missing sender configuration',
-        message: 'You must provide either TWILIO_MESSAGING_SERVICE_SID or TWILIO_PHONE_NUMBER'
-      });
-    }
+    // Return summary of all SMS sent
+    const successCount = results.filter(r => r.success).length;
+    const failCount = results.length - successCount;
 
-    console.log(`[${new Date().toISOString()}] Sending SMS to ${RECIPIENT}`);
-
-    // Twilio API endpoint
-    const twilioApiUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
-
-    // Create Basic Auth header
-    const authHeader = 'Basic ' + Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64');
-
-    // Prepare the SMS payload
-    const formData = new URLSearchParams();
-    
-    // Use MessagingServiceSid if provided, otherwise use From phone number
-    if (TWILIO_MESSAGING_SERVICE_SID) {
-      formData.append('MessagingServiceSid', TWILIO_MESSAGING_SERVICE_SID);
-      console.log('Using Messaging Service SID:', TWILIO_MESSAGING_SERVICE_SID);
-    } else {
-      formData.append('From', TWILIO_PHONE_NUMBER);
-      console.log('Using From phone number:', TWILIO_PHONE_NUMBER);
-    }
-    
-    formData.append('To', RECIPIENT);
-    formData.append('Body', MESSAGE_TEXT);
-
-    // Send POST request to Twilio API
-    const response = await fetch(twilioApiUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': authHeader,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: formData.toString()
-    });
-
-    const responseData = await response.json();
-
-    // Check if the request was successful
-    if (!response.ok) {
-      console.error('Twilio API Error:', responseData);
-      return res.status(response.status).json({
-        error: 'Failed to send SMS',
-        details: responseData
-      });
-    }
-
-    console.log('SMS sent successfully:', responseData);
-
-    // Return success response
     return res.status(200).json({
-      success: true,
-      message: 'SMS sent successfully',
+      success: successCount > 0,
+      message: `Sent ${successCount} SMS, ${failCount} failed`,
       timestamp: new Date().toISOString(),
       date: getTodaysDate(),
-      reminder: todaysReminder || null,
-      recipient: RECIPIENT,
-      messageId: responseData.sid,
-      status: responseData.status,
-      twilioResponse: {
-        sid: responseData.sid,
-        status: responseData.status,
-        to: responseData.to,
-        from: responseData.from,
-        dateCreated: responseData.date_created
-      }
+      totalReminders: results.length,
+      successCount,
+      failCount,
+      results
     });
 
   } catch (error) {

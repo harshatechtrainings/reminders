@@ -14,61 +14,100 @@ function getTodaysDate() {
   return `${year}-${month}-${day}`;
 }
 
-function getTodaysReminder() {
+function getAllTodaysReminders() {
   try {
-    const remindersPath = path.join(__dirname, 'reminders.json');
-    const remindersData = fs.readFileSync(remindersPath, 'utf8');
-    const reminders = JSON.parse(remindersData);
+    const dataPath = path.join(__dirname, 'data');
+    const files = fs.readdirSync(dataPath).filter(f => f.endsWith('.json'));
     
     const todaysDate = getTodaysDate();
-    const todaysReminder = reminders.reminders.find(r => r.date === todaysDate);
+    const allReminders = [];
+    const allUpcomingReminders = [];
     
-    return { todaysDate, todaysReminder, allReminders: reminders.reminders };
+    for (const file of files) {
+      try {
+        const filePath = path.join(dataPath, file);
+        const fileData = fs.readFileSync(filePath, 'utf8');
+        const reminderFile = JSON.parse(fileData);
+        
+        // Find reminder for today in this file
+        const todaysReminder = reminderFile.reminders?.find(r => r.date === todaysDate);
+        
+        if (todaysReminder) {
+          allReminders.push({
+            name: reminderFile.name,
+            phone: reminderFile.phone,
+            reminder: todaysReminder,
+            source: file
+          });
+        }
+        
+        // Collect upcoming reminders
+        reminderFile.reminders?.forEach(r => {
+          if (r.date >= todaysDate) {
+            allUpcomingReminders.push({
+              ...r,
+              name: reminderFile.name,
+              source: file
+            });
+          }
+        });
+      } catch (fileError) {
+        console.error(`Error reading ${file}:`, fileError.message);
+      }
+    }
+    
+    return { todaysDate, allReminders, allUpcomingReminders };
   } catch (error) {
-    console.error('Error reading reminders.json:', error.message);
+    console.error('Error reading reminders from data folder:', error.message);
     return null;
   }
 }
 
-console.log('\n📅 Tablet Reminder Checker\n');
+console.log('\n📅 Multi-Person Tablet Reminder Checker\n');
 
-const result = getTodaysReminder();
+const result = getAllTodaysReminders();
 
 if (!result) {
-  console.log('❌ Could not read reminders.json');
-  console.log('   Make sure the file exists in the project root.\n');
+  console.log('❌ Could not read reminders from data/ folder');
+  console.log('   Make sure the data/ folder exists with JSON files.\n');
   process.exit(1);
 }
 
 console.log(`📆 Today's Date: ${result.todaysDate}\n`);
 
-if (result.todaysReminder) {
-  console.log('✅ Reminder Found for Today!\n');
-  console.log('💊 Tablet:', result.todaysReminder.tablet);
-  console.log('🕐 Time:', result.todaysReminder.time);
-  console.log('📝 Notes:', result.todaysReminder.notes);
-  console.log('\n📱 SMS will be sent:');
-  console.log('─────────────────────────────────');
-  console.log(`📋 Daily Reminder!\n\n💊 Tablet: ${result.todaysReminder.tablet}\n🕐 Time: ${result.todaysReminder.time}\n📝 Notes: ${result.todaysReminder.notes}`);
-  console.log('─────────────────────────────────\n');
-} else {
-  console.log('ℹ️  No reminder scheduled for today\n');
-  console.log('📋 Upcoming reminders:');
+if (result.allReminders.length > 0) {
+  console.log(`✅ Found ${result.allReminders.length} Reminder(s) for Today!\n`);
   
-  const futureReminders = result.allReminders
-    .filter(r => r.date >= result.todaysDate)
+  result.allReminders.forEach(({ name, phone, reminder, source }) => {
+    console.log('═══════════════════════════════════');
+    console.log(`📄 File: ${source}`);
+    console.log(`👤 Name: ${name}`);
+    console.log(`📞 Phone: ${phone}`);
+    console.log(`💊 Tablet: ${reminder.tablet}`);
+    console.log(`🕐 Time: ${reminder.time}`);
+    console.log(`📝 Notes: ${reminder.notes}`);
+    console.log('\n📱 SMS will be sent:');
+    console.log('─────────────────────────────────');
+    console.log(`📋 Hello ${name}!\n\n💊 Tablet: ${reminder.tablet}\n🕐 Time: ${reminder.time}\n📝 Notes: ${reminder.notes}`);
+    console.log('─────────────────────────────────\n');
+  });
+} else {
+  console.log('ℹ️  No reminders scheduled for today\n');
+  console.log('📋 Upcoming reminders from all files:');
+  
+  const futureReminders = result.allUpcomingReminders
     .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(0, 5);
+    .slice(0, 10);
   
   if (futureReminders.length > 0) {
     futureReminders.forEach(r => {
-      console.log(`   ${r.date} - ${r.tablet}`);
+      console.log(`   ${r.date} - ${r.name}: ${r.tablet}`);
     });
   } else {
     console.log('   No upcoming reminders found');
   }
   
   console.log('\n💡 Add a reminder for today:');
-  console.log(`   Edit reminders.json and add a reminder with date: "${result.todaysDate}"\n`);
+  console.log(`   Edit JSON files in data/ folder and add a reminder with date: "${result.todaysDate}"\n`);
 }
 

@@ -25,72 +25,84 @@ function getTodaysDate() {
 }
 
 /**
- * Check if there's a reminder for today
+ * Get all reminders for today from all JSON files in data/ folder
+ * Returns array of { name, phone, reminder } objects
  */
-function getTodaysReminder() {
+function getAllTodaysReminders() {
   try {
-    const remindersPath = path.join(__dirname, 'reminders.json');
-    const remindersData = fs.readFileSync(remindersPath, 'utf8');
-    const reminders = JSON.parse(remindersData);
+    const dataPath = path.join(__dirname, 'data');
+    const files = fs.readdirSync(dataPath).filter(f => f.endsWith('.json'));
     
     const todaysDate = getTodaysDate();
-    const todaysReminder = reminders.reminders.find(r => r.date === todaysDate);
+    const allReminders = [];
     
-    return todaysReminder;
+    for (const file of files) {
+      try {
+        const filePath = path.join(dataPath, file);
+        const fileData = fs.readFileSync(filePath, 'utf8');
+        const reminderFile = JSON.parse(fileData);
+        
+        // Find reminder for today in this file
+        const todaysReminder = reminderFile.reminders?.find(r => r.date === todaysDate);
+        
+        if (todaysReminder) {
+          allReminders.push({
+            name: reminderFile.name,
+            phone: reminderFile.phone,
+            reminder: todaysReminder,
+            source: file
+          });
+        }
+      } catch (fileError) {
+        console.error(`⚠️  Error reading ${file}:`, fileError.message);
+      }
+    }
+    
+    return allReminders;
   } catch (error) {
-    console.error('⚠️  Warning: Could not read reminders.json:', error.message);
-    return null;
+    console.error('⚠️  Warning: Could not read reminders from data folder:', error.message);
+    return [];
   }
 }
 
 async function testTwilioSMS() {
-  console.log('\n📱 Testing Twilio SMS API with Reminder System...\n');
+  console.log('\n📱 Testing Twilio SMS API with Multi-Person Reminder System...\n');
 
   // Read environment variables
   const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
   const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
   const TWILIO_MESSAGING_SERVICE_SID = process.env.TWILIO_MESSAGING_SERVICE_SID;
   const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER;
-  const RECIPIENT = process.env.RECIPIENT;
   
-  // Check if there's a reminder for today
-  const todaysReminder = getTodaysReminder();
+  // Get all reminders for today from all JSON files
+  const allTodaysReminders = getAllTodaysReminders();
   const todaysDate = getTodaysDate();
   
-  let MESSAGE_TEXT;
-  if (todaysReminder) {
-    // Build message from reminder data
-    MESSAGE_TEXT = `📋 Daily Reminder!\n\n💊 Tablet: ${todaysReminder.tablet}\n🕐 Time: ${todaysReminder.time}\n📝 Notes: ${todaysReminder.notes}`;
-    console.log(`✅ Found reminder for today (${todaysDate}):`);
-    console.log(`   💊 ${todaysReminder.tablet}`);
-    console.log(`   🕐 ${todaysReminder.time}`);
-    console.log(`   📝 ${todaysReminder.notes}\n`);
-  } else {
-    // No reminder for today
-    const sendDefaultMessage = process.env.SEND_DEFAULT_MESSAGE !== 'false';
-    
-    if (!sendDefaultMessage) {
-      console.log(`ℹ️  No reminder scheduled for today (${todaysDate})`);
-      console.log('   SEND_DEFAULT_MESSAGE is set to false, so no SMS will be sent.\n');
-      console.log('💡 To add a reminder for today, edit reminders.json\n');
-      return;
-    }
-    
-    MESSAGE_TEXT = process.env.MESSAGE_TEXT || 'Daily update ✅ - No specific reminder for today!';
-    console.log(`ℹ️  No reminder found for today (${todaysDate})`);
-    console.log('   Using default message instead.\n');
+  if (allTodaysReminders.length === 0) {
+    console.log(`ℹ️  No reminders scheduled for today (${todaysDate})`);
+    console.log('   Check data/ folder for reminder files.\n');
+    console.log('💡 To add a reminder for today, create/edit JSON files in data/ folder\n');
+    return;
+  }
+
+  console.log(`✅ Found ${allTodaysReminders.length} reminder(s) for today (${todaysDate}):\n`);
+  
+  for (const { name, phone, reminder, source } of allTodaysReminders) {
+    console.log(`   📄 ${source}`);
+    console.log(`   👤 ${name} (${phone})`);
+    console.log(`   💊 ${reminder.tablet}`);
+    console.log(`   🕐 ${reminder.time}`);
+    console.log(`   📝 ${reminder.notes}\n`);
   }
 
   // Validate environment variables
   const missing = [];
   if (!TWILIO_ACCOUNT_SID) missing.push('TWILIO_ACCOUNT_SID');
   if (!TWILIO_AUTH_TOKEN) missing.push('TWILIO_AUTH_TOKEN');
-  if (!RECIPIENT) missing.push('RECIPIENT');
 
   if (missing.length > 0) {
     console.error('❌ Missing environment variables:', missing.join(', '));
-    console.error('\nPlease add them to your .env file');
-    console.error('See .env.twilio for examples\n');
+    console.error('\nPlease add them to your .env file\n');
     process.exit(1);
   }
 
@@ -108,93 +120,94 @@ async function testTwilioSMS() {
   } else {
     console.log('   From:', TWILIO_PHONE_NUMBER);
   }
-  console.log('   To:', RECIPIENT);
-  console.log('   Account SID:', TWILIO_ACCOUNT_SID.substring(0, 10) + '...');
-  console.log('\n📨 Message to send:');
-  console.log('─────────────────────────────────');
-  console.log(MESSAGE_TEXT);
-  console.log('─────────────────────────────────\n');
+  console.log('   Account SID:', TWILIO_ACCOUNT_SID.substring(0, 10) + '...\n');
 
-  // Twilio API endpoint
-  const twilioApiUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
+  console.log(`📤 Sending ${allTodaysReminders.length} SMS...\n`);
 
-  // Create Basic Auth header
-  const authHeader = 'Basic ' + Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64');
+  const results = [];
 
-  // Prepare the SMS payload
-  const formData = new URLSearchParams();
-  
-  // Use MessagingServiceSid if provided, otherwise use From phone number
-  if (TWILIO_MESSAGING_SERVICE_SID) {
-    formData.append('MessagingServiceSid', TWILIO_MESSAGING_SERVICE_SID);
-  } else {
-    formData.append('From', TWILIO_PHONE_NUMBER);
-  }
-  
-  formData.append('To', RECIPIENT);
-  formData.append('Body', MESSAGE_TEXT);
+  // Send SMS to each person with a reminder
+  for (const { name, phone, reminder, source } of allTodaysReminders) {
+    const MESSAGE_TEXT = `📋 Hello ${name}!\n\n💊 Tablet: ${reminder.tablet}\n🕐 Time: ${reminder.time}\n📝 Notes: ${reminder.notes}`;
+    const RECIPIENT = phone;
 
-  console.log('📤 Sending SMS...\n');
+    console.log(`➤ Sending to ${name} (${phone})...`);
 
-  try {
-    const response = await fetch(twilioApiUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': authHeader,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: formData.toString()
-    });
+    // Twilio API endpoint
+    const twilioApiUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
 
-    const data = await response.json();
+    // Create Basic Auth header
+    const authHeader = 'Basic ' + Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64');
 
-    if (response.ok) {
-      console.log('✅ SUCCESS! SMS sent successfully!\n');
-      console.log('📊 Response Details:');
-      console.log('   Message SID:', data.sid);
-      console.log('   Status:', data.status);
-      console.log('   To:', data.to);
-      console.log('   From:', data.from);
-      console.log('   Date Created:', data.date_created);
-      if (todaysReminder) {
-        console.log('\n💊 Reminder Sent:');
-        console.log('   Tablet:', todaysReminder.tablet);
-        console.log('   Time:', todaysReminder.time);
-      }
-      console.log('\n📱 Check your phone (+' + data.to.replace('+', '') + ') for the SMS!\n');
+    // Prepare the SMS payload
+    const formData = new URLSearchParams();
+    
+    // Use MessagingServiceSid if provided, otherwise use From phone number
+    if (TWILIO_MESSAGING_SERVICE_SID) {
+      formData.append('MessagingServiceSid', TWILIO_MESSAGING_SERVICE_SID);
     } else {
-      console.error('❌ ERROR! Failed to send SMS\n');
-      console.error('Status:', response.status);
-      console.error('Response:', JSON.stringify(data, null, 2));
-      
-      // Common error explanations
-      if (data.code) {
-        console.error('\n💡 Troubleshooting:');
-        
-        if (data.code === 21608) {
-          console.error('   → Trial account restriction');
-          console.error('   → Verify the recipient number in Twilio console');
-          console.error('   → Or upgrade your Twilio account');
-        } else if (data.code === 21211) {
-          console.error('   → Invalid "To" phone number');
-          console.error('   → Make sure it\'s in E.164 format (e.g., +919876543210)');
-        } else if (data.code === 21606) {
-          console.error('   → Invalid "From" phone number');
-          console.error('   → Use a valid Twilio number from your account');
-        } else if (data.code === 20003) {
-          console.error('   → Authentication error');
-          console.error('   → Check your Account SID and Auth Token');
-        } else if (data.code === 21614) {
-          console.error('   → Invalid phone number format');
-          console.error('   → Both numbers must include country code with +');
-        }
-      }
-      console.error('\n');
+      formData.append('From', TWILIO_PHONE_NUMBER);
     }
-  } catch (error) {
-    console.error('❌ NETWORK ERROR!\n');
-    console.error('Message:', error.message);
-    console.error('\nMake sure you have internet connection.\n');
+    
+    formData.append('To', RECIPIENT);
+    formData.append('Body', MESSAGE_TEXT);
+
+    try {
+      const response = await fetch(twilioApiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: formData.toString()
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        console.log(`   ✅ SUCCESS! Message ID: ${data.sid}\n`);
+        results.push({
+          name,
+          phone,
+          success: true,
+          messageId: data.sid,
+          status: data.status
+        });
+      } else {
+        console.error(`   ❌ FAILED! Status: ${response.status}`);
+        console.error(`   Error: ${JSON.stringify(data, null, 2)}\n`);
+        results.push({
+          name,
+          phone,
+          success: false,
+          error: data.message || 'Failed to send SMS'
+        });
+      }
+    } catch (smsError) {
+      console.error(`   ❌ ERROR: ${smsError.message}\n`);
+      results.push({
+        name,
+        phone,
+        success: false,
+        error: smsError.message
+      });
+    }
+  }
+
+  // Print summary
+  const successCount = results.filter(r => r.success).length;
+  const failCount = results.length - successCount;
+
+  console.log('═══════════════════════════════════');
+  console.log('📊 SUMMARY');
+  console.log('═══════════════════════════════════');
+  console.log(`Total reminders: ${results.length}`);
+  console.log(`✅ Sent successfully: ${successCount}`);
+  console.log(`❌ Failed: ${failCount}`);
+  console.log('═══════════════════════════════════\n');
+
+  if (successCount > 0) {
+    console.log('📱 Check phones for SMS!\n');
   }
 }
 
