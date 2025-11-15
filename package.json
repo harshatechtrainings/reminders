@@ -2,6 +2,7 @@
   "name": "my-whatsapp-bot",
   "version": "1.0.0",
   "description": "SMS notification bot with Twilio and daily cron scheduling on Vercel",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "dev": "react-scripts start",
