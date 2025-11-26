@@ -123,6 +123,52 @@ if (result.allReminders.length > 0) {
   });
 } else {
   console.log('ℹ️  No reminders scheduled for today\n');
+  console.log('📨 "No medications today" message will be sent to ALL contacts:\n');
+  
+  // Show all contacts who will receive the message
+  try {
+    const dataPath = path.join(__dirname, 'data');
+    const files = fs.readdirSync(dataPath).filter(f => f.endsWith('.json'));
+    
+    console.log('═══════════════════════════════════');
+    console.log('📋 CONTACTS WHO WILL RECEIVE SMS');
+    console.log('═══════════════════════════════════\n');
+    
+    let contactCount = 0;
+    for (const file of files) {
+      try {
+        const filePath = path.join(dataPath, file);
+        const fileData = fs.readFileSync(filePath, 'utf8');
+        const reminderFile = JSON.parse(fileData);
+        
+        if (reminderFile.phone) {
+          contactCount++;
+          console.log(`${contactCount}. ${reminderFile.name} (${reminderFile.phone})`);
+          if (reminderFile.dob) {
+            const ageDays = calculateAgeInDays(reminderFile.dob);
+            const months = Math.floor(ageDays / 30);
+            const days = ageDays % 30;
+            console.log(`   📅 Age: ${ageDays} days (${months} months, ${days} days)`);
+          }
+          console.log('   📱 SMS:');
+          const ageInfo = reminderFile.dob ? `\n📅 Age: ${calculateAgeInDays(reminderFile.dob)} days (${Math.floor(calculateAgeInDays(reminderFile.dob) / 30)} months, ${calculateAgeInDays(reminderFile.dob) % 30} days)` : '';
+          console.log(`   ─────────────────────────────────`);
+          console.log(`   📋 Hello ${reminderFile.name}!${ageInfo}\n\n   ✅ Good news! No medications scheduled for today.\n\n   🎉 Enjoy your day!`);
+          console.log(`   ─────────────────────────────────\n`);
+        }
+      } catch (fileError) {
+        console.error(`⚠️  Error reading ${file}:`, fileError.message);
+      }
+    }
+    
+    console.log('═══════════════════════════════════');
+    console.log(`Total contacts: ${contactCount}`);
+    console.log('═══════════════════════════════════\n');
+    
+  } catch (error) {
+    console.error('Error reading contacts:', error.message);
+  }
+  
   console.log('📋 Upcoming reminders from all files:');
   
   const futureReminders = result.allUpcomingReminders

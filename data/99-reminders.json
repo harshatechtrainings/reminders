@@ -1,118 +1,118 @@
 {
-    "name": "Pig 95 :8 Childs - Reminder Schedule",
+    "name": "Pig 99 :8 Childs - Reminder Schedule",
     "phone": "+919490979948",
-    "dob": "2025-08-22",
+    "dob": "2025-10-01",
     "reminders": [
       {
-        "date": "2025-08-25",
+        "date": "2025-10-04",
         "tablet": "IRON",
         "time": "morning",
-       
+        "count": 8,
         "notes": "IM, 1 ml, Brand: -"
       },
       {
-        "date": "2025-08-26",
+        "date": "2025-10-05",
         "tablet": "B-COMPLEX",
         "time": "morning",
-       
+        "count": 8,
         "notes": "IM, 1 ml, Brand: -"
       },
       {
-        "date": "2025-09-01",
+        "date": "2025-10-11",
         "tablet": "DEWORMING",
         "time": "morning",
-       
+        "count": 8,
         "notes": "ORAL, 1 ml, Brand: PEPRAZINE"
       },
       {
-        "date": "2025-09-02",
+        "date": "2025-10-12",
         "tablet": "LIV-52",
         "time": "morning",
-       
+        "count": 8,
         "notes": "ORAL, 1 ml, Brand: -"
       },
       {
-        "date": "2025-09-03",
+        "date": "2025-10-13",
         "tablet": "LIV-52",
         "time": "morning",
-       
+        "count": 8,
         "notes": "ORAL, 1 ml, Brand: -"
       },
       {
-        "date": "2025-09-04",
+        "date": "2025-10-14",
         "tablet": "IRON",
         "time": "morning",
-       
+        "count": 8,
         "notes": "IM, 2 ml, Brand: -"
       },
       {
-        "date": "2025-09-05",
+        "date": "2025-10-15",
         "tablet": "B-COMPLEX",
         "time": "morning",
-       
+        "count": 8,
         "notes": "IM, 2 ml, Brand: -"
       },
       {
-        "date": "2025-09-21",
+        "date": "2025-10-31",
         "tablet": "IRON",
         "time": "morning",
-       
+        "count": 8,
         "notes": "IM, 2 ml, Brand: -"
       },
       {
-        "date": "2025-09-26",
+        "date": "2025-11-05",
         "tablet": "DEWORMING",
         "time": "morning",
-       
+        "count": 8,
         "notes": "ORAL, 2 ml, Brand: PEPRAZINE"
       },
       {
-        "date": "2025-09-27",
+        "date": "2025-11-06",
         "tablet": "LIV-52",
         "time": "morning",
-       
+        "count": 8,
         "notes": "ORAL, 3 ml, Brand: -"
       },
       {
-        "date": "2025-09-28",
+        "date": "2025-11-07",
         "tablet": "LIV-52",
         "time": "morning",
-       
+        "count": 8,
         "notes": "ORAL, 3 ml, Brand: -"
       },
       {
-        "date": "2025-10-21",
+        "date": "2025-11-30",
         "tablet": "SWINE FEVER VACCINE",
         "time": "morning",
-       
+        "count": 8,
         "notes": "SUBCUT, 1 ml, Brand: -"
       },
       {
-        "date": "2025-11-12",
+        "date": "2025-12-22",
         "tablet": "DEWORMING",
         "time": "morning",
-       
+        "count": 8,
         "notes": "ORAL, 2 ml, Brand: FALBENDAZOLE"
       },
       {
-        "date": "2025-11-13",
+        "date": "2025-12-23",
         "tablet": "LIV-52",
         "time": "morning",
-       
+        "count": 8,
         "notes": "ORAL, 5 ml, Brand: -"
       },
       {
-        "date": "2025-11-14",
+        "date": "2025-12-24",
         "tablet": "LIV-52",
         "time": "morning",
-       
+        "count": 8,
         "notes": "ORAL, 5 ml, Brand: -"
       },
       {
-        "date": "2025-12-20",
+        "date": "2026-01-29",
         "tablet": "FMD, HS & BQ VACCINE",
         "time": "morning",
-       
+        "count": 8,
         "notes": "SUBCUT, 1 ml, Brand: -"
       }
     ]

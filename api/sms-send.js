@@ -139,24 +139,149 @@ export default async function handler(req, res) {
     const allTodaysReminders = getAllTodaysReminders();
     
     if (allTodaysReminders.length === 0) {
-      // No reminders for today
-      const sendDefaultMessage = process.env.SEND_DEFAULT_MESSAGE !== 'false';
+      // No reminders for today - send "No medications" message to all contacts
+      console.log(`No reminders found for today (${getTodaysDate()}), sending "No medications" message to all contacts`);
       
-      if (!sendDefaultMessage) {
+      const sendNoMedicationMessage = process.env.SEND_NO_MEDICATION_MESSAGE !== 'false';
+      
+      if (!sendNoMedicationMessage) {
         return res.status(200).json({
           success: true,
-          message: 'No reminders for today',
+          message: 'No reminders for today (not sending SMS)',
           date: getTodaysDate(),
           skipped: true
         });
       }
       
-      console.log(`No reminders found for today (${getTodaysDate()})`);
-      return res.status(200).json({
-        success: true,
-        message: 'No reminders scheduled for today',
-        date: getTodaysDate()
-      });
+      // Get all contact files to send "No medications" message
+      try {
+        const dataPath = join(process.cwd(), 'data');
+        const files = readdirSync(dataPath).filter(f => f.endsWith('.json'));
+        const results = [];
+        
+        for (const file of files) {
+          try {
+            const filePath = join(dataPath, file);
+            const fileData = readFileSync(filePath, 'utf8');
+            const reminderFile = JSON.parse(fileData);
+            
+            const name = reminderFile.name;
+            const phone = reminderFile.phone;
+            const dob = reminderFile.dob;
+            
+            if (!phone) continue; // Skip if no phone number
+            
+            const ageInfo = formatAgeInfo(dob);
+            const MESSAGE_TEXT = `📋 Hello ${name}!${ageInfo}\n\n✅ Good news! No medications scheduled for today.\n\n🎉 Enjoy your day!`;
+            
+            // Validate Twilio credentials
+            if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
+              results.push({
+                name,
+                phone,
+                success: false,
+                error: 'Missing Twilio credentials'
+              });
+              continue;
+            }
+
+            if (!TWILIO_MESSAGING_SERVICE_SID && !TWILIO_PHONE_NUMBER) {
+              results.push({
+                name,
+                phone,
+                success: false,
+                error: 'Missing sender configuration'
+              });
+              continue;
+            }
+
+            console.log(`[${new Date().toISOString()}] Sending "No medications" SMS to ${name} (${phone})`);
+
+            try {
+              // Twilio API endpoint
+              const twilioApiUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
+
+              // Create Basic Auth header
+              const authHeader = 'Basic ' + Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64');
+
+              // Prepare the SMS payload
+              const formData = new URLSearchParams();
+              
+              if (TWILIO_MESSAGING_SERVICE_SID) {
+                formData.append('MessagingServiceSid', TWILIO_MESSAGING_SERVICE_SID);
+              } else {
+                formData.append('From', TWILIO_PHONE_NUMBER);
+              }
+              
+              formData.append('To', phone);
+              formData.append('Body', MESSAGE_TEXT);
+
+              // Send POST request to Twilio API
+              const response = await fetch(twilioApiUrl, {
+                method: 'POST',
+                headers: {
+                  'Authorization': authHeader,
+                  'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: formData.toString()
+              });
+
+              const responseData = await response.json();
+
+              if (!response.ok) {
+                console.error(`SMS failed for ${name}:`, responseData);
+                results.push({
+                  name,
+                  phone,
+                  success: false,
+                  error: responseData.message || 'Failed to send SMS'
+                });
+              } else {
+                console.log(`SMS sent successfully to ${name}:`, responseData.sid);
+                results.push({
+                  name,
+                  phone,
+                  success: true,
+                  messageId: responseData.sid,
+                  status: responseData.status,
+                  messageType: 'no_medications'
+                });
+              }
+            } catch (smsError) {
+              console.error(`Error sending SMS to ${name}:`, smsError);
+              results.push({
+                name,
+                phone,
+                success: false,
+                error: smsError.message
+              });
+            }
+          } catch (fileError) {
+            console.error(`Error reading ${file}:`, fileError.message);
+          }
+        }
+        
+        const successCount = results.filter(r => r.success).length;
+        const failCount = results.length - successCount;
+
+        return res.status(200).json({
+          success: successCount > 0,
+          message: `No medications today - Sent ${successCount} SMS, ${failCount} failed`,
+          timestamp: new Date().toISOString(),
+          date: getTodaysDate(),
+          totalContacts: results.length,
+          successCount,
+          failCount,
+          messageType: 'no_medications',
+          results
+        });
+      } catch (error) {
+        console.error('Error sending no-medication messages:', error);
+        return res.status(500).json({
+          error: 'Failed to send no-medication messages',
+          message: error.message
+        });
+      }
     }
     
     console.log(`Found ${allTodaysReminders.length} reminder(s) for today (${getTodaysDate()})`);

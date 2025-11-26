@@ -122,9 +122,154 @@ async function testTwilioSMS() {
   
   if (allTodaysReminders.length === 0) {
     console.log(`ℹ️  No reminders scheduled for today (${todaysDate})`);
-    console.log('   Check data/ folder for reminder files.\n');
-    console.log('💡 To add a reminder for today, create/edit JSON files in data/ folder\n');
-    return;
+    console.log('   Will send "No medications today" message to all contacts.\n');
+    
+    const sendNoMedicationMessage = process.env.SEND_NO_MEDICATION_MESSAGE !== 'false';
+    
+    if (!sendNoMedicationMessage) {
+      console.log('❌ SEND_NO_MEDICATION_MESSAGE is set to false, skipping SMS.\n');
+      return;
+    }
+    
+    // Get all contacts from data/ folder
+    try {
+      const dataPath = path.join(__dirname, 'data');
+      const files = fs.readdirSync(dataPath).filter(f => f.endsWith('.json'));
+      
+      console.log(`📋 Found ${files.length} contact(s) to notify:\n`);
+      
+      const allContacts = [];
+      for (const file of files) {
+        try {
+          const filePath = path.join(dataPath, file);
+          const fileData = fs.readFileSync(filePath, 'utf8');
+          const reminderFile = JSON.parse(fileData);
+          
+          if (reminderFile.phone) {
+            allContacts.push({
+              name: reminderFile.name,
+              phone: reminderFile.phone,
+              dob: reminderFile.dob,
+              source: file
+            });
+            
+            console.log(`   📄 ${file}`);
+            console.log(`   👤 ${reminderFile.name} (${reminderFile.phone})`);
+            if (reminderFile.dob) {
+              const ageDays = calculateAgeInDays(reminderFile.dob);
+              const months = Math.floor(ageDays / 30);
+              const days = ageDays % 30;
+              console.log(`   🎂 DOB: ${reminderFile.dob} (${ageDays} days old = ${months}m ${days}d)`);
+            }
+            console.log('');
+          }
+        } catch (fileError) {
+          console.error(`⚠️  Error reading ${file}:`, fileError.message);
+        }
+      }
+      
+      if (allContacts.length === 0) {
+        console.log('❌ No valid contacts found in data/ folder\n');
+        return;
+      }
+      
+      // Continue with sending SMS to all contacts
+      console.log('📋 SMS Configuration:');
+      console.log('   Date:', todaysDate);
+      if (TWILIO_MESSAGING_SERVICE_SID) {
+        console.log('   Messaging Service SID:', TWILIO_MESSAGING_SERVICE_SID);
+      } else {
+        console.log('   From:', TWILIO_PHONE_NUMBER);
+      }
+      console.log('   Account SID:', TWILIO_ACCOUNT_SID.substring(0, 10) + '...\n');
+
+      console.log(`📤 Sending "No medications" SMS to ${allContacts.length} contact(s)...\n`);
+
+      const results = [];
+
+      for (const { name, phone, dob, source } of allContacts) {
+        const ageInfo = formatAgeInfo(dob);
+        const MESSAGE_TEXT = `📋 Hello ${name}!${ageInfo}\n\n✅ Good news! No medications scheduled for today.\n\n🎉 Enjoy your day!`;
+        const RECIPIENT = phone;
+
+        console.log(`➤ Sending to ${name} (${phone})...`);
+
+        const twilioApiUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
+        const authHeader = 'Basic ' + Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64');
+
+        const formData = new URLSearchParams();
+        
+        if (TWILIO_MESSAGING_SERVICE_SID) {
+          formData.append('MessagingServiceSid', TWILIO_MESSAGING_SERVICE_SID);
+        } else {
+          formData.append('From', TWILIO_PHONE_NUMBER);
+        }
+        
+        formData.append('To', RECIPIENT);
+        formData.append('Body', MESSAGE_TEXT);
+
+        try {
+          const response = await fetch(twilioApiUrl, {
+            method: 'POST',
+            headers: {
+              'Authorization': authHeader,
+              'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: formData.toString()
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            console.log(`   ✅ SUCCESS! Message ID: ${data.sid}\n`);
+            results.push({
+              name,
+              phone,
+              success: true,
+              messageId: data.sid,
+              status: data.status
+            });
+          } else {
+            console.error(`   ❌ FAILED! Status: ${response.status}`);
+            console.error(`   Error: ${JSON.stringify(data, null, 2)}\n`);
+            results.push({
+              name,
+              phone,
+              success: false,
+              error: data.message || 'Failed to send SMS'
+            });
+          }
+        } catch (smsError) {
+          console.error(`   ❌ ERROR: ${smsError.message}\n`);
+          results.push({
+            name,
+            phone,
+            success: false,
+            error: smsError.message
+          });
+        }
+      }
+
+      const successCount = results.filter(r => r.success).length;
+      const failCount = results.length - successCount;
+
+      console.log('═══════════════════════════════════');
+      console.log('📊 SUMMARY - NO MEDICATIONS TODAY');
+      console.log('═══════════════════════════════════');
+      console.log(`Total contacts: ${results.length}`);
+      console.log(`✅ Sent successfully: ${successCount}`);
+      console.log(`❌ Failed: ${failCount}`);
+      console.log('═══════════════════════════════════\n');
+
+      if (successCount > 0) {
+        console.log('📱 Check phones for "No medications today" SMS!\n');
+      }
+      
+      return;
+    } catch (error) {
+      console.error('❌ Error processing contacts:', error.message);
+      return;
+    }
   }
 
   console.log(`✅ Found ${allTodaysReminders.length} reminder(s) for today (${todaysDate}):\n`);
