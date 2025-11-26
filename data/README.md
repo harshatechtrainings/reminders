@@ -10,6 +10,7 @@ Each file should follow this format:
 {
   "name": "Person Name",
   "phone": "+919876543210",
+  "dob": "2025-08-01",
   "reminders": [
     {
       "date": "2025-11-15",
@@ -25,8 +26,9 @@ Each file should follow this format:
 
 | Field | Required | Format | Example |
 |-------|----------|--------|---------|
-| `name` | ✅ Yes | String | `"Harsha"`, `"Mom"` |
+| `name` | ✅ Yes | String | `"Harsha"`, `"Pig 94"` |
 | `phone` | ✅ Yes | E.164 format with + | `"+918886968635"` |
+| `dob` | ⚠️ Optional | YYYY-MM-DD | `"2025-08-01"` |
 | `reminders` | ✅ Yes | Array of objects | See below |
 
 ### Reminder Object:
@@ -42,6 +44,17 @@ Each file should follow this format:
 
 When a reminder matches today's date, an SMS is sent:
 
+**With DOB:**
+```
+📋 Hello {name}!
+📅 Age: {days} days ({months} months, {days} days)
+
+💊 Tablet: {tablet}
+🕐 Time: {time}
+📝 Notes: {notes}
+```
+
+**Without DOB:**
 ```
 📋 Hello {name}!
 
@@ -52,24 +65,35 @@ When a reminder matches today's date, an SMS is sent:
 
 ## 📂 Example Files
 
-- **harsha-reminders.json** - Reminders for Harsha
-- **family-reminders.json** - Reminders for family members
+- **harsha-reminders.json** - Reminders for Pig 1
+- **family-reminders.json** - Reminders for Pig 2
+- **94-reminders.json** - Reminders for Pig 94 (7 children)
+- **95-reminders.json** - Reminders for Pig 95
 
-## ➕ Adding New Person
+## 🐷 Use Case: Pig Farm Management
+
+This system is perfect for tracking pig medication schedules:
+- **DOB tracking** - Know exactly how old each pig is
+- **Medication reminders** - Get SMS for daily injections, dewormers, vitamins
+- **Multiple pigs** - Manage entire farm in one place
+- **Age in message** - Each SMS shows pig's current age in days
+
+## ➕ Adding New Pig/Person
 
 Create a new JSON file:
 
 ```bash
-# Example: dad-reminders.json
+# Example: pig-96-reminders.json
 {
-  "name": "Dad",
+  "name": "Pig 96",
   "phone": "+919123456789",
+  "dob": "2025-08-15",
   "reminders": [
     {
       "date": "2025-11-15",
-      "tablet": "Blood Pressure Medicine",
+      "tablet": "IRON",
       "time": "morning",
-      "notes": "Take with breakfast"
+      "notes": "IM, 1 ml, Brand: -"
     }
   ]
 }

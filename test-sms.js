@@ -25,6 +25,47 @@ function getTodaysDate() {
 }
 
 /**
+ * Calculate age in days from DOB to current date
+ */
+function calculateAgeInDays(dob) {
+  if (!dob) return null;
+  
+  try {
+    const birthDate = new Date(dob);
+    const today = new Date();
+    
+    // Set time to midnight to get accurate day count
+    birthDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    
+    const diffTime = today - birthDate;
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    return diffDays;
+  } catch (error) {
+    console.error('Error calculating age:', error);
+    return null;
+  }
+}
+
+/**
+ * Format age info for message
+ */
+function formatAgeInfo(dob) {
+  const days = calculateAgeInDays(dob);
+  if (days === null || days < 0) return '';
+  
+  const months = Math.floor(days / 30);
+  const remainingDays = days % 30;
+  
+  if (months > 0) {
+    return `\n📅 Age: ${days} days (${months} month${months > 1 ? 's' : ''}, ${remainingDays} days)`;
+  } else {
+    return `\n📅 Age: ${days} days`;
+  }
+}
+
+/**
  * Get all reminders for today from all JSON files in data/ folder
  * Returns array of { name, phone, reminder } objects
  */
@@ -49,6 +90,7 @@ function getAllTodaysReminders() {
           allReminders.push({
             name: reminderFile.name,
             phone: reminderFile.phone,
+            dob: reminderFile.dob,
             reminder: todaysReminder,
             source: file
           });
@@ -87,9 +129,15 @@ async function testTwilioSMS() {
 
   console.log(`✅ Found ${allTodaysReminders.length} reminder(s) for today (${todaysDate}):\n`);
   
-  for (const { name, phone, reminder, source } of allTodaysReminders) {
+  for (const { name, phone, dob, reminder, source } of allTodaysReminders) {
     console.log(`   📄 ${source}`);
     console.log(`   👤 ${name} (${phone})`);
+    if (dob) {
+      const ageDays = calculateAgeInDays(dob);
+      const months = Math.floor(ageDays / 30);
+      const days = ageDays % 30;
+      console.log(`   🎂 DOB: ${dob} (${ageDays} days old = ${months}m ${days}d)`);
+    }
     console.log(`   💊 ${reminder.tablet}`);
     console.log(`   🕐 ${reminder.time}`);
     console.log(`   📝 ${reminder.notes}\n`);
@@ -127,8 +175,9 @@ async function testTwilioSMS() {
   const results = [];
 
   // Send SMS to each person with a reminder
-  for (const { name, phone, reminder, source } of allTodaysReminders) {
-    const MESSAGE_TEXT = `📋 Hello ${name}!\n\n💊 Tablet: ${reminder.tablet}\n🕐 Time: ${reminder.time}\n📝 Notes: ${reminder.notes}`;
+  for (const { name, phone, dob, reminder, source } of allTodaysReminders) {
+    const ageInfo = formatAgeInfo(dob);
+    const MESSAGE_TEXT = `📋 Hello ${name}!${ageInfo}\n\n💊 Tablet: ${reminder.tablet}\n🕐 Time: ${reminder.time}\n📝 Notes: ${reminder.notes}`;
     const RECIPIENT = phone;
 
     console.log(`➤ Sending to ${name} (${phone})...`);

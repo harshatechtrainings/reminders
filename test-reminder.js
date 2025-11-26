@@ -14,6 +14,25 @@ function getTodaysDate() {
   return `${year}-${month}-${day}`;
 }
 
+function calculateAgeInDays(dob) {
+  if (!dob) return null;
+  
+  try {
+    const birthDate = new Date(dob);
+    const today = new Date();
+    
+    birthDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    
+    const diffTime = today - birthDate;
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    return diffDays;
+  } catch (error) {
+    return null;
+  }
+}
+
 function getAllTodaysReminders() {
   try {
     const dataPath = path.join(__dirname, 'data');
@@ -36,6 +55,7 @@ function getAllTodaysReminders() {
           allReminders.push({
             name: reminderFile.name,
             phone: reminderFile.phone,
+            dob: reminderFile.dob,
             reminder: todaysReminder,
             source: file
           });
@@ -78,17 +98,27 @@ console.log(`📆 Today's Date: ${result.todaysDate}\n`);
 if (result.allReminders.length > 0) {
   console.log(`✅ Found ${result.allReminders.length} Reminder(s) for Today!\n`);
   
-  result.allReminders.forEach(({ name, phone, reminder, source }) => {
+  result.allReminders.forEach(({ name, phone, dob, reminder, source }) => {
     console.log('═══════════════════════════════════');
     console.log(`📄 File: ${source}`);
     console.log(`👤 Name: ${name}`);
     console.log(`📞 Phone: ${phone}`);
+    
+    if (dob) {
+      const ageDays = calculateAgeInDays(dob);
+      const months = Math.floor(ageDays / 30);
+      const days = ageDays % 30;
+      console.log(`🎂 DOB: ${dob} → Age: ${ageDays} days (${months} months, ${days} days)`);
+    }
+    
     console.log(`💊 Tablet: ${reminder.tablet}`);
     console.log(`🕐 Time: ${reminder.time}`);
     console.log(`📝 Notes: ${reminder.notes}`);
     console.log('\n📱 SMS will be sent:');
     console.log('─────────────────────────────────');
-    console.log(`📋 Hello ${name}!\n\n💊 Tablet: ${reminder.tablet}\n🕐 Time: ${reminder.time}\n📝 Notes: ${reminder.notes}`);
+    
+    const ageInfo = dob ? `\n📅 Age: ${calculateAgeInDays(dob)} days (${Math.floor(calculateAgeInDays(dob) / 30)} months, ${calculateAgeInDays(dob) % 30} days)` : '';
+    console.log(`📋 Hello ${name}!${ageInfo}\n\n💊 Tablet: ${reminder.tablet}\n🕐 Time: ${reminder.time}\n📝 Notes: ${reminder.notes}`);
     console.log('─────────────────────────────────\n');
   });
 } else {
