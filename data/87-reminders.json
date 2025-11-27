@@ -1,0 +1,103 @@
+{
+    "name": "Pig 87 :7 Childs - Reminder Schedule",
+    "phone": "+919490979948",
+    "dob": "2025-11-03",
+    "reminders": [
+        {
+            "date": "2025-11-06",
+            "tablet": "IRON",
+            "time": "morning",
+            "notes": "IM, 1 ml, Brand: -"
+        },
+        {
+            "date": "2025-11-07",
+            "tablet": "B-COMPLEX",
+            "time": "morning",
+            "notes": "IM, 1 ml, Brand: -"
+        },
+        {
+            "date": "2025-11-13",
+            "tablet": "DEWORMING",
+            "time": "morning",
+            "notes": "ORAL, 1 ml, Brand: PEPRAZINE"
+        },
+        {
+            "date": "2025-11-14",
+            "tablet": "LIV-52",
+            "time": "morning",
+            "notes": "ORAL, 1 ml, Brand: -"
+        },
+        {
+            "date": "2025-11-15",
+            "tablet": "LIV-52",
+            "time": "morning",
+            "notes": "ORAL, 1 ml, Brand: -"
+        },
+        {
+            "date": "2025-11-16",
+            "tablet": "IRON",
+            "time": "morning",
+            "notes": "IM, 2 ml, Brand: -"
+        },
+        {
+            "date": "2025-11-17",
+            "tablet": "B-COMPLEX",
+            "time": "morning",
+            "notes": "IM, 2 ml, Brand: -"
+        },
+        {
+            "date": "2025-12-03",
+            "tablet": "IRON",
+            "time": "morning",
+            "notes": "IM, 2 ml, Brand: -"
+        },
+        {
+            "date": "2025-12-08",
+            "tablet": "DEWORMING",
+            "time": "morning",
+            "notes": "ORAL, 2 ml, Brand: PEPRAZINE"
+        },
+        {
+            "date": "2025-12-09",
+            "tablet": "LIV-52",
+            "time": "morning",
+            "notes": "ORAL, 3 ml, Brand: -"
+        },
+        {
+            "date": "2025-12-10",
+            "tablet": "LIV-52",
+            "time": "morning",
+            "notes": "ORAL, 3 ml, Brand: -"
+        },
+        {
+            "date": "2026-01-02",
+            "tablet": "SWINE FEVER VACCINE",
+            "time": "morning",
+            "notes": "SUBCUT, 1 ml, Brand: -"
+        },
+        {
+            "date": "2026-01-24",
+            "tablet": "DEWORMING",
+            "time": "morning",
+            "notes": "ORAL, 2 ml, Brand: FALBENDAZOLE"
+        },
+        {
+            "date": "2026-01-25",
+            "tablet": "LIV-52",
+            "time": "morning",
+            "notes": "ORAL, 5 ml, Brand: -"
+        },
+        {
+            "date": "2026-01-26",
+            "tablet": "LIV-52",
+            "time": "morning",
+            "notes": "ORAL, 5 ml, Brand: -"
+        },
+        {
+            "date": "2026-03-03",
+            "tablet": "FMD, HS & BQ VACCINE",
+            "time": "morning",
+            "notes": "SUBCUT, 1 ml, Brand: -"
+        }
+    ]
+}
