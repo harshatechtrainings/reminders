@@ -139,10 +139,11 @@ export default async function handler(req, res) {
     const allTodaysReminders = getAllTodaysReminders();
     
     if (allTodaysReminders.length === 0) {
-      // No reminders for today - send "No medications" message to all contacts
-      console.log(`No reminders found for today (${getTodaysDate()}), sending "No medications" message to all contacts`);
+      // No reminders for today - send ONE consolidated message
+      console.log(`No reminders found for today (${getTodaysDate()}), sending single consolidated message`);
       
       const sendNoMedicationMessage = process.env.SEND_NO_MEDICATION_MESSAGE !== 'false';
+      const NOTIFICATION_PHONE = process.env.NOTIFICATION_PHONE || process.env.RECIPIENT;
       
       if (!sendNoMedicationMessage) {
         return res.status(200).json({
@@ -153,132 +154,79 @@ export default async function handler(req, res) {
         });
       }
       
-      // Get all contact files to send "No medications" message
+      if (!NOTIFICATION_PHONE) {
+        return res.status(400).json({
+          error: 'NOTIFICATION_PHONE not configured',
+          message: 'Please set NOTIFICATION_PHONE environment variable for no-medication alerts'
+        });
+      }
+      
+      // Count total pigs in data folder
       try {
         const dataPath = join(process.cwd(), 'data');
         const files = readdirSync(dataPath).filter(f => f.endsWith('.json'));
-        const results = [];
+        const pigCount = files.length;
         
-        for (const file of files) {
-          try {
-            const filePath = join(dataPath, file);
-            const fileData = readFileSync(filePath, 'utf8');
-            const reminderFile = JSON.parse(fileData);
-            
-            const name = reminderFile.name;
-            const phone = reminderFile.phone;
-            const dob = reminderFile.dob;
-            
-            if (!phone) continue; // Skip if no phone number
-            
-            const ageInfo = formatAgeInfo(dob);
-            const MESSAGE_TEXT = `📋 Hello ${name}!${ageInfo}\n\n✅ Good news! No medications scheduled for today.\n\n🎉 Enjoy your day!`;
-            
-            // Validate Twilio credentials
-            if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
-              results.push({
-                name,
-                phone,
-                success: false,
-                error: 'Missing Twilio credentials'
-              });
-              continue;
-            }
+        // Create consolidated message
+        const MESSAGE_TEXT = `🐷 Farm Update - ${getTodaysDate()}\n\n✅ No medications scheduled today!\n\n📊 Total Pigs: ${pigCount}\n💊 Medications: 0\n\n🎉 All clear for today!`;
+        
+        console.log(`[${new Date().toISOString()}] Sending consolidated "No medications" SMS to ${NOTIFICATION_PHONE}`);
 
-            if (!TWILIO_MESSAGING_SERVICE_SID && !TWILIO_PHONE_NUMBER) {
-              results.push({
-                name,
-                phone,
-                success: false,
-                error: 'Missing sender configuration'
-              });
-              continue;
-            }
+        // Twilio API endpoint
+        const twilioApiUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
 
-            console.log(`[${new Date().toISOString()}] Sending "No medications" SMS to ${name} (${phone})`);
+        // Create Basic Auth header
+        const authHeader = 'Basic ' + Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64');
 
-            try {
-              // Twilio API endpoint
-              const twilioApiUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
-
-              // Create Basic Auth header
-              const authHeader = 'Basic ' + Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64');
-
-              // Prepare the SMS payload
-              const formData = new URLSearchParams();
-              
-              if (TWILIO_MESSAGING_SERVICE_SID) {
-                formData.append('MessagingServiceSid', TWILIO_MESSAGING_SERVICE_SID);
-              } else {
-                formData.append('From', TWILIO_PHONE_NUMBER);
-              }
-              
-              formData.append('To', phone);
-              formData.append('Body', MESSAGE_TEXT);
-
-              // Send POST request to Twilio API
-              const response = await fetch(twilioApiUrl, {
-                method: 'POST',
-                headers: {
-                  'Authorization': authHeader,
-                  'Content-Type': 'application/x-www-form-urlencoded'
-                },
-                body: formData.toString()
-              });
-
-              const responseData = await response.json();
-
-              if (!response.ok) {
-                console.error(`SMS failed for ${name}:`, responseData);
-                results.push({
-                  name,
-                  phone,
-                  success: false,
-                  error: responseData.message || 'Failed to send SMS'
-                });
-              } else {
-                console.log(`SMS sent successfully to ${name}:`, responseData.sid);
-                results.push({
-                  name,
-                  phone,
-                  success: true,
-                  messageId: responseData.sid,
-                  status: responseData.status,
-                  messageType: 'no_medications'
-                });
-              }
-            } catch (smsError) {
-              console.error(`Error sending SMS to ${name}:`, smsError);
-              results.push({
-                name,
-                phone,
-                success: false,
-                error: smsError.message
-              });
-            }
-          } catch (fileError) {
-            console.error(`Error reading ${file}:`, fileError.message);
-          }
+        // Prepare the SMS payload
+        const formData = new URLSearchParams();
+        
+        if (TWILIO_MESSAGING_SERVICE_SID) {
+          formData.append('MessagingServiceSid', TWILIO_MESSAGING_SERVICE_SID);
+        } else {
+          formData.append('From', TWILIO_PHONE_NUMBER);
         }
         
-        const successCount = results.filter(r => r.success).length;
-        const failCount = results.length - successCount;
+        formData.append('To', NOTIFICATION_PHONE);
+        formData.append('Body', MESSAGE_TEXT);
+
+        // Send POST request to Twilio API
+        const response = await fetch(twilioApiUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': authHeader,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: formData.toString()
+        });
+
+        const responseData = await response.json();
+
+        if (!response.ok) {
+          console.error('SMS failed:', responseData);
+          return res.status(response.status).json({
+            error: 'Failed to send no-medication alert',
+            details: responseData
+          });
+        }
+
+        console.log('Consolidated SMS sent successfully:', responseData.sid);
 
         return res.status(200).json({
-          success: successCount > 0,
-          message: `No medications today - Sent ${successCount} SMS, ${failCount} failed`,
+          success: true,
+          message: 'No medications today - Sent 1 consolidated SMS',
           timestamp: new Date().toISOString(),
           date: getTodaysDate(),
-          totalContacts: results.length,
-          successCount,
-          failCount,
+          totalPigs: pigCount,
           messageType: 'no_medications',
-          results
+          recipient: NOTIFICATION_PHONE,
+          messageId: responseData.sid,
+          status: responseData.status
         });
       } catch (error) {
-        console.error('Error sending no-medication messages:', error);
+        console.error('Error sending no-medication message:', error);
         return res.status(500).json({
-          error: 'Failed to send no-medication messages',
+          error: 'Failed to send no-medication message',
           message: error.message
         });
       }

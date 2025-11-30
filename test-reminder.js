@@ -123,50 +123,46 @@ if (result.allReminders.length > 0) {
   });
 } else {
   console.log('ℹ️  No reminders scheduled for today\n');
-  console.log('📨 "No medications today" message will be sent to ALL contacts:\n');
+  console.log('📨 ONE consolidated "No medications today" message will be sent:\n');
   
-  // Show all contacts who will receive the message
+  // Count pigs and prepare consolidated message
   try {
     const dataPath = path.join(__dirname, 'data');
     const files = fs.readdirSync(dataPath).filter(f => f.endsWith('.json'));
+    const pigCount = files.length;
+    
+    const NOTIFICATION_PHONE = process.env.NOTIFICATION_PHONE || process.env.RECIPIENT || 'NOT_CONFIGURED';
     
     console.log('═══════════════════════════════════');
-    console.log('📋 CONTACTS WHO WILL RECEIVE SMS');
+    console.log('📋 CONSOLIDATED SMS (1 message only)');
     console.log('═══════════════════════════════════\n');
     
-    let contactCount = 0;
-    for (const file of files) {
-      try {
-        const filePath = path.join(dataPath, file);
-        const fileData = fs.readFileSync(filePath, 'utf8');
-        const reminderFile = JSON.parse(fileData);
-        
-        if (reminderFile.phone) {
-          contactCount++;
-          console.log(`${contactCount}. ${reminderFile.name} (${reminderFile.phone})`);
-          if (reminderFile.dob) {
-            const ageDays = calculateAgeInDays(reminderFile.dob);
-            const months = Math.floor(ageDays / 30);
-            const days = ageDays % 30;
-            console.log(`   📅 Age: ${ageDays} days (${months} months, ${days} days)`);
-          }
-          console.log('   📱 SMS:');
-          const ageInfo = reminderFile.dob ? `\n📅 Age: ${calculateAgeInDays(reminderFile.dob)} days (${Math.floor(calculateAgeInDays(reminderFile.dob) / 30)} months, ${calculateAgeInDays(reminderFile.dob) % 30} days)` : '';
-          console.log(`   ─────────────────────────────────`);
-          console.log(`   📋 Hello ${reminderFile.name}!${ageInfo}\n\n   ✅ Good news! No medications scheduled for today.\n\n   🎉 Enjoy your day!`);
-          console.log(`   ─────────────────────────────────\n`);
-        }
-      } catch (fileError) {
-        console.error(`⚠️  Error reading ${file}:`, fileError.message);
-      }
+    console.log(`📊 Farm Status:`);
+    console.log(`   Total pigs: ${pigCount}`);
+    console.log(`   Medications today: 0`);
+    console.log(`   Notification phone: ${NOTIFICATION_PHONE}\n`);
+    
+    const MESSAGE_TEXT = `🐷 Farm Update - ${result.todaysDate}\n\n✅ No medications scheduled today!\n\n📊 Total Pigs: ${pigCount}\n💊 Medications: 0\n\n🎉 All clear for today!`;
+    
+    console.log('📱 SMS that will be sent:');
+    console.log('─────────────────────────────────');
+    console.log(MESSAGE_TEXT);
+    console.log('─────────────────────────────────\n');
+    
+    console.log('💰 Cost Savings:');
+    console.log(`   Old way: ${pigCount} SMS (1 per pig)`);
+    console.log(`   New way: 1 SMS (consolidated)`);
+    console.log(`   Savings: ${pigCount - 1} SMS per day! 🎉\n`);
+    
+    console.log('═══════════════════════════════════\n');
+    
+    if (NOTIFICATION_PHONE === 'NOT_CONFIGURED') {
+      console.log('⚠️  Warning: NOTIFICATION_PHONE not set in .env');
+      console.log('   Add: NOTIFICATION_PHONE=+919876543210\n');
     }
     
-    console.log('═══════════════════════════════════');
-    console.log(`Total contacts: ${contactCount}`);
-    console.log('═══════════════════════════════════\n');
-    
   } catch (error) {
-    console.error('Error reading contacts:', error.message);
+    console.error('Error reading pig files:', error.message);
   }
   
   console.log('📋 Upcoming reminders from all files:');

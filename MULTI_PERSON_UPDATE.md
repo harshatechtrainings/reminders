@@ -213,3 +213,5 @@ Date: 2025-11-15
 Version: 2.0.0 - Multi-Person Support
 
 
+
+

@@ -122,58 +122,35 @@ async function testTwilioSMS() {
   
   if (allTodaysReminders.length === 0) {
     console.log(`ℹ️  No reminders scheduled for today (${todaysDate})`);
-    console.log('   Will send "No medications today" message to all contacts.\n');
+    console.log('   Will send ONE consolidated "No medications today" message.\n');
     
     const sendNoMedicationMessage = process.env.SEND_NO_MEDICATION_MESSAGE !== 'false';
+    const NOTIFICATION_PHONE = process.env.NOTIFICATION_PHONE || process.env.RECIPIENT;
     
     if (!sendNoMedicationMessage) {
       console.log('❌ SEND_NO_MEDICATION_MESSAGE is set to false, skipping SMS.\n');
       return;
     }
     
-    // Get all contacts from data/ folder
+    if (!NOTIFICATION_PHONE) {
+      console.log('❌ NOTIFICATION_PHONE not configured in .env file\n');
+      console.log('   Add: NOTIFICATION_PHONE=+919876543210\n');
+      return;
+    }
+    
+    // Count pigs in data/ folder
     try {
       const dataPath = path.join(__dirname, 'data');
       const files = fs.readdirSync(dataPath).filter(f => f.endsWith('.json'));
+      const pigCount = files.length;
       
-      console.log(`📋 Found ${files.length} contact(s) to notify:\n`);
+      console.log(`📊 Farm Status:`);
+      console.log(`   Total pigs: ${pigCount}`);
+      console.log(`   Medications today: 0`);
+      console.log(`   Notification phone: ${NOTIFICATION_PHONE}\n`);
       
-      const allContacts = [];
-      for (const file of files) {
-        try {
-          const filePath = path.join(dataPath, file);
-          const fileData = fs.readFileSync(filePath, 'utf8');
-          const reminderFile = JSON.parse(fileData);
-          
-          if (reminderFile.phone) {
-            allContacts.push({
-              name: reminderFile.name,
-              phone: reminderFile.phone,
-              dob: reminderFile.dob,
-              source: file
-            });
-            
-            console.log(`   📄 ${file}`);
-            console.log(`   👤 ${reminderFile.name} (${reminderFile.phone})`);
-            if (reminderFile.dob) {
-              const ageDays = calculateAgeInDays(reminderFile.dob);
-              const months = Math.floor(ageDays / 30);
-              const days = ageDays % 30;
-              console.log(`   🎂 DOB: ${reminderFile.dob} (${ageDays} days old = ${months}m ${days}d)`);
-            }
-            console.log('');
-          }
-        } catch (fileError) {
-          console.error(`⚠️  Error reading ${file}:`, fileError.message);
-        }
-      }
+      const MESSAGE_TEXT = `🐷 Farm Update - ${todaysDate}\n\n✅ No medications scheduled today!\n\n📊 Total Pigs: ${pigCount}\n💊 Medications: 0\n\n🎉 All clear for today!`;
       
-      if (allContacts.length === 0) {
-        console.log('❌ No valid contacts found in data/ folder\n');
-        return;
-      }
-      
-      // Continue with sending SMS to all contacts
       console.log('📋 SMS Configuration:');
       console.log('   Date:', todaysDate);
       if (TWILIO_MESSAGING_SERVICE_SID) {
@@ -181,88 +158,54 @@ async function testTwilioSMS() {
       } else {
         console.log('   From:', TWILIO_PHONE_NUMBER);
       }
-      console.log('   Account SID:', TWILIO_ACCOUNT_SID.substring(0, 10) + '...\n');
+      console.log('   To:', NOTIFICATION_PHONE);
+      console.log('   Account SID:', TWILIO_ACCOUNT_SID.substring(0, 10) + '...');
+      console.log('\n📨 Consolidated message to send:');
+      console.log('─────────────────────────────────');
+      console.log(MESSAGE_TEXT);
+      console.log('─────────────────────────────────\n');
 
-      console.log(`📤 Sending "No medications" SMS to ${allContacts.length} contact(s)...\n`);
+      console.log(`📤 Sending consolidated SMS...\n`);
 
-      const results = [];
+      const twilioApiUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
+      const authHeader = 'Basic ' + Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64');
 
-      for (const { name, phone, dob, source } of allContacts) {
-        const ageInfo = formatAgeInfo(dob);
-        const MESSAGE_TEXT = `📋 Hello ${name}!${ageInfo}\n\n✅ Good news! No medications scheduled for today.\n\n🎉 Enjoy your day!`;
-        const RECIPIENT = phone;
-
-        console.log(`➤ Sending to ${name} (${phone})...`);
-
-        const twilioApiUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
-        const authHeader = 'Basic ' + Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64');
-
-        const formData = new URLSearchParams();
-        
-        if (TWILIO_MESSAGING_SERVICE_SID) {
-          formData.append('MessagingServiceSid', TWILIO_MESSAGING_SERVICE_SID);
-        } else {
-          formData.append('From', TWILIO_PHONE_NUMBER);
-        }
-        
-        formData.append('To', RECIPIENT);
-        formData.append('Body', MESSAGE_TEXT);
-
-        try {
-          const response = await fetch(twilioApiUrl, {
-            method: 'POST',
-            headers: {
-              'Authorization': authHeader,
-              'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: formData.toString()
-          });
-
-          const data = await response.json();
-
-          if (response.ok) {
-            console.log(`   ✅ SUCCESS! Message ID: ${data.sid}\n`);
-            results.push({
-              name,
-              phone,
-              success: true,
-              messageId: data.sid,
-              status: data.status
-            });
-          } else {
-            console.error(`   ❌ FAILED! Status: ${response.status}`);
-            console.error(`   Error: ${JSON.stringify(data, null, 2)}\n`);
-            results.push({
-              name,
-              phone,
-              success: false,
-              error: data.message || 'Failed to send SMS'
-            });
-          }
-        } catch (smsError) {
-          console.error(`   ❌ ERROR: ${smsError.message}\n`);
-          results.push({
-            name,
-            phone,
-            success: false,
-            error: smsError.message
-          });
-        }
+      const formData = new URLSearchParams();
+      
+      if (TWILIO_MESSAGING_SERVICE_SID) {
+        formData.append('MessagingServiceSid', TWILIO_MESSAGING_SERVICE_SID);
+      } else {
+        formData.append('From', TWILIO_PHONE_NUMBER);
       }
+      
+      formData.append('To', NOTIFICATION_PHONE);
+      formData.append('Body', MESSAGE_TEXT);
 
-      const successCount = results.filter(r => r.success).length;
-      const failCount = results.length - successCount;
+      try {
+        const response = await fetch(twilioApiUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': authHeader,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: formData.toString()
+        });
 
-      console.log('═══════════════════════════════════');
-      console.log('📊 SUMMARY - NO MEDICATIONS TODAY');
-      console.log('═══════════════════════════════════');
-      console.log(`Total contacts: ${results.length}`);
-      console.log(`✅ Sent successfully: ${successCount}`);
-      console.log(`❌ Failed: ${failCount}`);
-      console.log('═══════════════════════════════════\n');
+        const data = await response.json();
 
-      if (successCount > 0) {
-        console.log('📱 Check phones for "No medications today" SMS!\n');
+        if (response.ok) {
+          console.log('✅ SUCCESS! Consolidated SMS sent!\n');
+          console.log('📊 Response Details:');
+          console.log('   Message SID:', data.sid);
+          console.log('   Status:', data.status);
+          console.log('   To:', data.to);
+          console.log('   Cost savings: Sent 1 SMS instead of', pigCount, 'SMS!\n');
+        } else {
+          console.error('❌ FAILED! Status:', response.status);
+          console.error('Error:', JSON.stringify(data, null, 2), '\n');
+        }
+      } catch (smsError) {
+        console.error('❌ ERROR:', smsError.message, '\n');
       }
       
       return;
