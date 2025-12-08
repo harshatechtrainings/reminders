@@ -1,23 +1,28 @@
 {
-  "name": "my-whatsapp-bot",
-  "version": "1.0.0",
-  "description": "SMS notification bot with Twilio and daily cron scheduling on Vercel",
+  "name": "pig-farm-reminders",
+  "version": "2.0.0",
+  "description": "Pig farm medication reminders via Email (Gmail) or SMS (Twilio) on Vercel",
   "main": "index.js",
   "scripts": {
     "dev": "react-scripts start",
     "dev:api": "node server-local.js",
     "build": "react-scripts build",
-    "test": "node test-sms.js",
+    "test": "node test-email.js",
+    "test:email": "node test-email.js",
     "test:sms": "node test-sms.js",
     "test:reminder": "node test-reminder.js",
     "vercel-build": "react-scripts build"
   },
   "keywords": [
+    "email",
+    "gmail",
+    "nodemailer",
     "sms",
     "twilio",
     "vercel",
     "cron",
-    "notifications"
+    "pig-farm",
+    "reminders"
   ],
   "author": "",
   "license": "MIT",
@@ -25,6 +30,7 @@
     "axios": "^1.6.2",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
+    "nodemailer": "^7.0.11",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-scripts": "5.0.1"
@@ -42,4 +48,3 @@
     ]
   }
 }
-

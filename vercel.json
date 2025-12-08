@@ -3,7 +3,7 @@
   "outputDirectory": "build",
   "crons": [
     {
-      "path": "/api/sms-send",
+      "path": "/api/email-send",
       "schedule": "30 2 * * *"
     }
   ]
